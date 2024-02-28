@@ -1,60 +1,196 @@
-import 'dart:async';
 import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-Future<List<Recipe>> fetchRecipes() async {
-  final response = await http.get(Uri.parse('https://api.spoonacular.com/recipes/findByIngredients?ingredients=apples,+flour,+sugar&number=2&apiKey=d73f6315ce544b6bbfed948d3b360d92'));
-
-  if (response.statusCode == 200) {
-    Iterable l = json.decode(response.body);
-    return List<Recipe>.from(l.map((model) => Recipe.fromJson(model)));
-  } else {
-    throw Exception('Failed to load recipes');
-  }
+void main() {
+  runApp(FOODGeNApp());
 }
 
-class Recipe {
-  final int id;
-  final String title;
-  final String? image; // Nullable type
-  final String? imageType; // Nullable type
-  final int usedIngredientCount;
-  final int missedIngredientCount;
-  final List<Ingredient> missedIngredients;
-  final List<Ingredient> usedIngredients;
-  final List<Ingredient> unusedIngredients;
-  final int likes;
-
-  Recipe({
-    required this.id,
-    required this.title,
-    this.image, // Nullable
-    this.imageType, // Nullable
-    required this.usedIngredientCount,
-    required this.missedIngredientCount,
-    required this.missedIngredients,
-    required this.usedIngredients,
-    required this.unusedIngredients,
-    required this.likes,
-  });
-
-  factory Recipe.fromJson(Map<String, dynamic> json) {
-    return Recipe(
-      id: json['id'],
-      title: json['title'],
-      image: json['image'] as String?, // Nullable with type casting
-      imageType: json['imageType'] as String?, // Nullable with type casting
-      usedIngredientCount: json['usedIngredientCount'],
-      missedIngredientCount: json['missedIngredientCount'],
-      missedIngredients: List<Ingredient>.from(json['missedIngredients'].map((x) => Ingredient.fromJson(x))),
-      usedIngredients: List<Ingredient>.from(json['usedIngredients'].map((x) => Ingredient.fromJson(x))),
-      unusedIngredients: List<Ingredient>.from(json['unusedIngredients'].map((x) => Ingredient.fromJson(x))),
-      likes: json['likes'],
+class FOODGeNApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'FoodGen',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+      ),
+      initialRoute: '/login',
+      routes: {
+        '/login': (context) => LoginScreen(),
+        '/home': (context) => RecipeListScreen(),
+        // Add more routes as needed
+      },
     );
   }
 }
 
+class LoginScreen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Login')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            TextFormField(
+              decoration: InputDecoration(
+                labelText: 'Email',
+                prefixIcon: Icon(Icons.email),
+              ),
+              keyboardType: TextInputType.emailAddress,
+              // Add validation logic here (e.g., validator)
+            ),
+            SizedBox(height: 16),
+            TextFormField(
+              decoration: InputDecoration(
+                labelText: 'Password',
+                prefixIcon: Icon(Icons.lock),
+              ),
+              obscureText: true,
+              // Add validation logic here (e.g., validator)
+            ),
+            SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushReplacementNamed(context, '/home');
+              },
+              child: Text('Login'),
+            ),
+            TextButton(
+              onPressed: () {
+                // Navigate to the forgot password screen
+                // Implement this route as needed
+              },
+              child: Text('Forgot Password?'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class RecipeListScreen extends StatefulWidget {
+  @override
+  _RecipeListScreenState createState() => _RecipeListScreenState();
+}
+
+class _RecipeListScreenState extends State<RecipeListScreen> {
+  List<Recipe> recipes = [];
+  bool isLoading = true;
+  TextEditingController ingredientsController = TextEditingController();
+
+  static const String apiKey = 'd73f6315ce544b6bbfed948d3b360d92';
+  static const String baseApiUrl = 'https://api.spoonacular.com/recipes/findByIngredients?ingredients=apples,+flour,+sugar&number=2&apiKey=d73f6315ce544b6bbfed948d3b360d92';
+
+  @override
+  void initState() {
+    super.initState();
+    fetchRecipes();
+  }
+
+  Future<void> fetchRecipes({String? ingredients}) async {
+    try {
+      final url = ingredients != null
+          ? '$baseApiUrl?apiKey=$apiKey&ingredients=$ingredients'
+          : '$baseApiUrl?apiKey=$apiKey';
+
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          recipes = data.map((json) => Recipe.fromJson(json)).toList();
+          isLoading = false;
+        });
+      } else {
+        // Display error message using SnackBar
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error fetching recipes: ${response.statusCode}'),
+          ),
+        );
+        setState(() {
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      // Display error message using SnackBar
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Exception fetching recipes: $e'),
+        ),
+      );
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Recipe Generator')),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: ingredientsController,
+                    decoration: InputDecoration(
+                      labelText: 'Enter Ingredients',
+                      prefixIcon: Icon(Icons.shopping_cart),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 16),
+                ElevatedButton(
+                  onPressed: () {
+                    fetchRecipes(ingredients: ingredientsController.text);
+                  },
+                  child: Text('Generate Recipes'),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: isLoading
+                ? Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    itemCount: recipes.length,
+                    itemBuilder: (context, index) {
+                      final recipe = recipes[index];
+                      return ListTile(
+                        title: Text(recipe.title),
+                        subtitle: Text(recipe.description),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class Recipe {
+  final String title;
+  final String description;
+
+  Recipe({required this.title, required this.description});
+
+  factory Recipe.fromJson(Map<String, dynamic> json) {
+    return Recipe(
+      title: json['title'],
+      description: json['description'],
+    );
+  }
+}
 class Ingredient {
   final int id;
   final double? amount; // Nullable type
@@ -102,58 +238,3 @@ class Ingredient {
   }
 }
 
-
-void main() => runApp(const MyApp());
-
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  late Future<List<Recipe>> futureRecipes;
-
-  @override
-  void initState() {
-    super.initState();
-    futureRecipes = fetchRecipes();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Fetch Data Example',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Fetch Data Example'),
-        ),
-        body: Center(
-          child: FutureBuilder<List<Recipe>>(
-            future: futureRecipes,
-            builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                return ListView.builder(
-                  itemCount: snapshot.data!.length,
-                  itemBuilder: (context, index) {
-                    return ListTile(
-                      title: Text(snapshot.data![index].title),
-                    );
-                  },
-                );
-              } else if (snapshot.hasError) {
-                return Text('${snapshot.error}');
-              }
-
-              return const CircularProgressIndicator();
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}
