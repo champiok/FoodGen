@@ -83,8 +83,8 @@ class _RecipeListScreenState extends State<RecipeListScreen> {
   bool isLoading = true;
   TextEditingController ingredientsController = TextEditingController();
 
-  static const String apiKey = 'd73f6315ce544b6bbfed948d3b360d92';
-  static const String baseApiUrl = 'https://api.spoonacular.com/recipes/findByIngredients?ingredients=apples,+flour,+sugar&number=2&apiKey=d73f6315ce544b6bbfed948d3b360d92';
+  static const String apiKey = ' 11775279883c4685915ff70114eaaae0';
+  static const String baseApiUrl = 'https://spoonacular.com/food-api';
 
   @override
   void initState() {
