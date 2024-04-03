@@ -1,0 +1,215 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+// Ingredient model class
+class Ingredient {
+  final int id;
+  final double? amount;
+  final String? unit;
+  final String? unitLong;
+  final String? unitShort;
+  final String aisle;
+  final String name;
+  final String original;
+  final String? originalName;
+  final List<String>? meta;
+  final String? extendedName;
+  final String? image;
+
+  Ingredient({
+    required this.id,
+    this.amount,
+    this.unit,
+    this.unitLong,
+    this.unitShort,
+    required this.aisle,
+    required this.name,
+    required this.original,
+    this.originalName,
+    this.meta,
+    this.extendedName,
+    this.image,
+  });
+
+  factory Ingredient.fromJson(Map<String, dynamic> json) {
+    return Ingredient(
+      id: json['id'],
+      amount: json['amount']?.toDouble(),
+      unit: json['unit'],
+      unitLong: json['unitLong'],
+      unitShort: json['unitShort'],
+      aisle: json['aisle'],
+      name: json['name'],
+      original: json['original'],
+      originalName: json['originalName'],
+      meta: json['meta'] != null ? List<String>.from(json['meta']) : null,
+      extendedName: json['extendedName'],
+      image: json['image'],
+    );
+  }
+}
+
+// Recipe model class
+class Recipe {
+  final int id;
+  final String title;
+  final String? image;
+  final String? imageType;
+  final int usedIngredientCount;
+  final int missedIngredientCount;
+  final List<Ingredient> missedIngredients;
+  final List<Ingredient> usedIngredients;
+  final List<Ingredient> unusedIngredients;
+  final int likes;
+
+  Recipe({
+    required this.id,
+    required this.title,
+    this.image,
+    this.imageType,
+    required this.usedIngredientCount,
+    required this.missedIngredientCount,
+    required this.missedIngredients,
+    required this.usedIngredients,
+    required this.unusedIngredients,
+    required this.likes,
+  });
+
+  factory Recipe.fromJson(Map<String, dynamic> json) {
+    return Recipe(
+      id: json['id'],
+      title: json['title'],
+      image: json['image'],
+      imageType: json['imageType'],
+      usedIngredientCount: json['usedIngredientCount'],
+      missedIngredientCount: json['missedIngredientCount'],
+      missedIngredients: List<Ingredient>.from(
+          json['missedIngredients'].map((x) => Ingredient.fromJson(x))),
+      usedIngredients: List<Ingredient>.from(
+          json['usedIngredients'].map((x) => Ingredient.fromJson(x))),
+      unusedIngredients: List<Ingredient>.from(
+          json['unusedIngredients'].map((x) => Ingredient.fromJson(x))),
+      likes: json['likes'],
+    );
+  }
+}
+
+// Function to fetch recipes from the API
+Future<List<Recipe>> fetchRecipes(List<String> ingredients) async {
+  final ingredientsQuery = ingredients.join(',');
+  final url =
+      'https://api.spoonacular.com/recipes/findByIngredients?ingredients=$ingredientsQuery&number=10&apiKey=800fad2c8b12472198d0a3421f5a76a4';
+  final response = await http.get(Uri.parse(url));
+
+  if (response.statusCode == 200) {
+    Iterable l = json.decode(response.body);
+    return List<Recipe>.from(l.map((model) => Recipe.fromJson(model)));
+  } else {
+    throw Exception('Failed to load recipes');
+  }
+}
+
+// RecipeScreen widget
+class RecipeScreen extends StatefulWidget {
+  @override
+  _RecipeScreenState createState() => _RecipeScreenState();
+}
+
+class _RecipeScreenState extends State<RecipeScreen> {
+  late Future<List<Recipe>> futureRecipes;
+  final TextEditingController _controller = TextEditingController();
+  List<String> ingredients = ['milk']; // Default ingredient
+
+  @override
+  void initState() {
+    super.initState();
+    futureRecipes = fetchRecipes(ingredients);
+  }
+
+  void addIngredient() {
+    final ingredient = _controller.text.trim();
+    if (ingredient.isNotEmpty && !ingredients.contains(ingredient)) {
+      setState(() {
+        ingredients.add(ingredient);
+        futureRecipes = fetchRecipes(ingredients);
+      });
+      _controller.clear();
+    }
+  }
+
+  void removeIngredient(String ingredient) {
+    setState(() {
+      ingredients.remove(ingredient);
+      futureRecipes = fetchRecipes(ingredients);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Isaiah Example Homepage',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      ),
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('Fetch Data Example'),
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                controller: _controller,
+                decoration: InputDecoration(
+                  labelText: 'Search & Add Ingredient',
+                  border: OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: addIngredient,
+                  ),
+                ),
+                onSubmitted: (_) => addIngredient(),
+              ),
+            ),
+            Wrap(
+              children: ingredients
+                  .map((ingredient) => Chip(
+                        label: Text(ingredient),
+                        onDeleted: () => removeIngredient(ingredient),
+                      ))
+                  .toList(),
+            ),
+            Expanded(
+              child: FutureBuilder<List<Recipe>>(
+                future: futureRecipes,
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    return ListView.builder(
+                      itemCount: snapshot.data!.length,
+                      itemBuilder: (context, index) {
+                        return Card(
+                          child: ListTile(
+                            leading: snapshot.data![index].image != null
+                                ? Image.network(snapshot.data![index].image!)
+                                : null,
+                            title: Text(snapshot.data![index].title),
+                          ),
+                        );
+                      },
+                    );
+                  } else if (snapshot.hasError) {
+                    return Text('${snapshot.error}');
+                  }
+                  return const CircularProgressIndicator();
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
