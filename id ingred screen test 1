@@ -1,0 +1,236 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
+// Define a map of ingredient IDs to names (you need to populate this)
+
+Map<int, int> ingredientIdToName = {
+  636411: 1
+  // Add more mappings as needed
+};
+
+// Recipe model class (unchanged)
+class IRecipe {
+  final int id;
+  final String title;
+  final String? image;
+  final String? imageType;
+  final int usedIngredientCount;
+  final int missedIngredientCount;
+  final List<Ingredient> missedIngredients;
+  final List<Ingredient> usedIngredients;
+  final List<Ingredient> unusedIngredients;
+  final int likes;
+
+  IRecipe({
+    required this.id,
+    required this.title,
+    this.image,
+    this.imageType,
+    required this.usedIngredientCount,
+    required this.missedIngredientCount,
+    required this.missedIngredients,
+    required this.usedIngredients,
+    required this.unusedIngredients,
+    required this.likes,
+  });
+
+  factory IRecipe.fromJson(Map<String, dynamic> json) {
+    return IRecipe(
+      id: json['id'],
+      title: json['title'],
+      image: json['image'],
+      imageType: json['imageType'],
+      usedIngredientCount: json['usedIngredientCount'],
+      missedIngredientCount: json['missedIngredientCount'],
+      missedIngredients: List<Ingredient>.from(
+          json['missedIngredients'].map((x) => Ingredient.fromJson(x))),
+      usedIngredients: List<Ingredient>.from(
+          json['usedIngredients'].map((x) => Ingredient.fromJson(x))),
+      unusedIngredients: List<Ingredient>.from(
+          json['unusedIngredients'].map((x) => Ingredient.fromJson(x))),
+      likes: json['likes'],
+    );
+  }
+}
+
+// Ingredient model class (unchanged)
+class Ingredient {
+  final int id;
+  final double? amount;
+  final String? unit;
+  final String? unitLong;
+  final String? unitShort;
+  final String aisle;
+  final String name;
+  final String original;
+  final String? originalName;
+  final List<String>? meta;
+  final String? extendedName;
+  final String? image;
+
+  Ingredient({
+    required this.id,
+    this.amount,
+    this.unit,
+    this.unitLong,
+    this.unitShort,
+    required this.aisle,
+    required this.name,
+    required this.original,
+    this.originalName,
+    this.meta,
+    this.extendedName,
+    this.image,
+  });
+
+  factory Ingredient.fromJson(Map<String, dynamic> json) {
+    return Ingredient(
+      id: json['id'],
+      amount: json['amount']?.toDouble(),
+      unit: json['unit'],
+      unitLong: json['unitLong'],
+      unitShort: json['unitShort'],
+      aisle: json['aisle'],
+      name: json['name'],
+      original: json['original'],
+      originalName: json['originalName'],
+      meta: json['meta'] != null ? List<String>.from(json['meta']) : null,
+      extendedName: json['extendedName'],
+      image: json['image'],
+    );
+  }
+}
+
+// Function to fetch recipes from the API using ingredient names
+Future<List<IRecipe>> fetchRecipes(List<int> ingredientIds) async {
+  // Translate ingredient IDs to names
+  //List<int> ingredients =
+    //  ingredientIds.map((id) => ingredientIdToName[id] ?? '').toList();
+  final idQuery = ingredients.join(',');
+  final url =
+      'https://api.spoonacular.com/recipes/$idQuery/information?apiKey=800fad2c8b12472198d0a3421f5a76a4&=$idQuery';
+
+  //    'https://api.spoonacular.com/recipes/findByIngredients?ingredients=$ingredientsQuery&number=10&apiKey=800fad2c8b12472198d0a3421f5a76a4';
+  final response = await http.get(Uri.parse(url));
+
+  if (response.statusCode == 200) {
+    Iterable l = json.decode(response.body);
+    return List<IRecipe>.from(l.map((model) => IRecipe.fromJson(model)));
+  } else {
+    throw Exception('Failed to load recipes');
+  }
+}
+
+// RecipeScreen widget (unchanged)
+class IngredientScreen extends StatefulWidget {
+  @override
+  _IngredientScreenState createState() => _IngredientScreenState();
+}
+
+class _IngredientScreenState extends State<IngredientScreen> {
+  late Future<List<IRecipe>> futureRecipes;
+  final TextEditingController _controller = TextEditingController();
+  List<int> ingredientIds = [1]; // Default ingredient IDs
+
+  @override
+  void initState() {
+    super.initState();
+    futureRecipes = fetchRecipes(ingredientIds);
+  }
+
+  void addIngredient() {
+    final ingredientId = int.tryParse(_controller.text.trim()) ?? 0;
+    if (ingredientId != 0 && !ingredientIds.contains(ingredientId)) {
+      setState(() {
+        ingredientIds.add(ingredientId);
+        futureRecipes = fetchRecipes(ingredientIds);
+      });
+      _controller.clear();
+    }
+  }
+
+  void removeIngredient(int ingredientId) {
+    setState(() {
+      ingredientIds.remove(ingredientId);
+      futureRecipes = fetchRecipes(ingredientIds);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Recipe Search',
+      home: Scaffold(
+        appBar: AppBar(
+          title: const Text('Recipe Search'),
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: TextField(
+                controller: _controller,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Search & Add Ingredient ID',
+                  border: OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: addIngredient,
+                  ),
+                ),
+                onSubmitted: (_) => addIngredient(),
+              ),
+            ),
+            Wrap(
+              children: ingredientIds
+                  .map((ingredientId) => Chip(
+                        label: Text('ID: $ingredientId'),
+                        onDeleted: () => removeIngredient(ingredientId),
+                      ))
+                  .toList(),
+            ),
+            Expanded(
+              child: FutureBuilder<List<IRecipe>>(
+                future: futureRecipes,
+                builder: (context, snapshot) {
+                  if (snapshot.hasData) {
+                    return ListView.builder(
+                      itemCount: snapshot.data!.length,
+                      itemBuilder: (context, index) {
+                        final recipe = snapshot.data![index];
+                        return Card(
+                          child: ListTile(
+                            leading: recipe.image != null
+                                ? Image.network(recipe.image!)
+                                : null,
+                            title: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('ID: ${recipe.id}'),
+                                Text(recipe.title),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  } else if (snapshot.hasError) {
+                    return Text('${snapshot.error}');
+                  }
+                  return const CircularProgressIndicator();
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+void main() {
+  runApp(IngredientScreen());
+}
