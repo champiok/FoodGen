@@ -15,6 +15,7 @@ class IngredientScreen extends StatefulWidget {
 class _IngredientScreenState extends State<IngredientScreen> {
   final TextEditingController _controller = TextEditingController();
   late Future<RecipeInformation> _futureRecipeInformation;
+  String? _imageUrl;
 
   @override
   void initState() {
@@ -29,7 +30,13 @@ class _IngredientScreenState extends State<IngredientScreen> {
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
-      return RecipeInformation.fromJson(json.decode(response.body));
+      final data = json.decode(response.body);
+      if (data['image'] != null) {
+        setState(() {
+          _imageUrl = data['image'];
+        });
+      }
+      return RecipeInformation.fromJson(data);
     } else {
       throw Exception('Failed to load recipe information');
     }
@@ -66,6 +73,16 @@ class _IngredientScreenState extends State<IngredientScreen> {
                 },
               ),
             ),
+            _imageUrl != null
+                ? Container(
+                    height: MediaQuery.of(context).size.height *
+                        0.3, // Adjust the height as needed
+                    child: Image.network(
+                      _imageUrl!,
+                      fit: BoxFit.cover,
+                    ),
+                  )
+                : Container(),
             Expanded(
               child: FutureBuilder<RecipeInformation>(
                 future: _futureRecipeInformation,
@@ -108,6 +125,44 @@ class _IngredientScreenState extends State<IngredientScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+class RecipeInformation {
+  final int id;
+  final String title;
+  final String? image;
+  final int readyInMinutes;
+  final int servings;
+  final List<String> cuisines;
+  final List<String> dishTypes;
+  final List<String> diets;
+  final String instructions;
+
+  RecipeInformation({
+    required this.id,
+    required this.title,
+    this.image,
+    required this.readyInMinutes,
+    required this.servings,
+    required this.cuisines,
+    required this.dishTypes,
+    required this.diets,
+    required this.instructions,
+  });
+
+  factory RecipeInformation.fromJson(Map<String, dynamic> json) {
+    return RecipeInformation(
+      id: json['id'],
+      title: json['title'],
+      image: json['image'],
+      readyInMinutes: json['readyInMinutes'],
+      servings: json['servings'],
+      cuisines: List<String>.from(json['cuisines']),
+      dishTypes: List<String>.from(json['dishTypes']),
+      diets: List<String>.from(json['diets']),
+      instructions: json['instructions'],
     );
   }
 }
